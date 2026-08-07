@@ -113,3 +113,17 @@ def create_job(db: Session, job_data: dict, embedding: List[float] = None) -> Op
     db.commit()
     db.refresh(job)
     return job
+
+def search_jobs_semantically(db: Session, profile_embedding: List[float], limit: int = 100):
+    """
+    Returns jobs ordered by cosine distance to the given profile_embedding.
+    """
+    distance_col = Job.embedding.cosine_distance(profile_embedding).label("distance")
+    results = (
+        db.query(Job, distance_col)
+        .filter(Job.embedding.isnot(None))
+        .order_by(distance_col)
+        .limit(limit)
+        .all()
+    )
+    return results

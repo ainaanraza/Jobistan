@@ -14,6 +14,7 @@ class JobBase(BaseModel):
 class Job(JobBase):
     id: int
     company_name: Optional[str] = None
+    match_score: Optional[float] = None
 
     class Config:
         from_attributes = True

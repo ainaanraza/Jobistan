@@ -253,7 +253,13 @@ export default function DashboardPage() {
                       
                       <div className="flex items-center gap-6">
                         <div className="text-right">
-                          <div className="text-sm font-medium text-emerald-400 mb-1">High Match</div>
+                          {job.match_score !== undefined && job.match_score !== null ? (
+                            <div className={`text-sm font-bold mb-1 ${job.match_score >= 80 ? 'text-emerald-400' : job.match_score >= 50 ? 'text-yellow-400' : 'text-orange-400'}`}>
+                              {job.match_score}% Match
+                            </div>
+                          ) : (
+                            <div className="text-sm font-medium text-zinc-500 mb-1">New Job</div>
+                          )}
                           <div className="text-sm text-zinc-300">{job.salary_range || 'Undisclosed'}</div>
                         </div>
                         <a 
