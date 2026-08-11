@@ -6,14 +6,16 @@ import { useAuthStore } from '@/store/auth';
 import { api } from '@/lib/api';
 import { 
   LogOut, Briefcase, User as UserIcon, Bell, Search, Star, Clock, 
-  MapPin, Building2, ChevronRight, Save, Database, AlertCircle, Sparkles
+  MapPin, Building2, ChevronRight, Save, Database, AlertCircle, Sparkles,
+  Link2, Plus, Trash2, Edit2, LayoutDashboard
 } from 'lucide-react';
+import KanbanBoard from '@/components/KanbanBoard';
 
 export default function DashboardPage() {
   const { user, profile, isAuthenticated, fetchUser, fetchProfile, updateProfile, logout } = useAuthStore();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'jobs' | 'profile'>('jobs');
+  const [activeTab, setActiveTab] = useState<'jobs' | 'applications' | 'profile' | 'sources'>('jobs');
   const [jobs, setJobs] = useState<any[]>([]);
   const [fetchingJobs, setFetchingJobs] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -30,8 +32,17 @@ export default function DashboardPage() {
     salary_expectations: '',
     linkedin_url: '',
     github_url: '',
-    portfolio_url: ''
+    portfolio_url: '',
+    college: '',
+    school: '',
+    city: '',
+    projects: ''
   });
+
+  const [jobSources, setJobSources] = useState<any[]>([]);
+  const [fetchingSources, setFetchingSources] = useState(false);
+  const [showAddSource, setShowAddSource] = useState(false);
+  const [sourceForm, setSourceForm] = useState({ name: '', url: '', source_type: 'company_career_page' });
 
   useEffect(() => {
     const init = async () => {
@@ -55,10 +66,54 @@ export default function DashboardPage() {
         salary_expectations: profile.salary_expectations || '',
         linkedin_url: profile.linkedin_url || '',
         github_url: profile.github_url || '',
-        portfolio_url: profile.portfolio_url || ''
+        portfolio_url: profile.portfolio_url || '',
+        college: profile.college || '',
+        school: profile.school || '',
+        city: profile.city || '',
+        projects: profile.projects || ''
       });
     }
   }, [profile]);
+
+  const fetchJobSources = async () => {
+    setFetchingSources(true);
+    try {
+      const response = await api.get('/sources/');
+      setJobSources(response.data);
+    } catch (error) {
+      console.error('Failed to fetch job sources', error);
+    } finally {
+      setFetchingSources(false);
+    }
+  };
+
+  const handleAddSource = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.post('/sources/', sourceForm);
+      setSourceForm({ name: '', url: '', source_type: 'company_career_page' });
+      setShowAddSource(false);
+      fetchJobSources();
+    } catch (error) {
+      console.error('Failed to add job source', error);
+    }
+  };
+
+  const handleDeleteSource = async (id: number) => {
+    try {
+      await api.delete(`/sources/${id}`);
+      fetchJobSources();
+    } catch (error) {
+      console.error('Failed to delete job source', error);
+    }
+  };
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchJobs();
+      fetchJobSources();
+    }
+  }, [isAuthenticated]);
 
   const fetchJobs = async () => {
     setFetchingJobs(true);
@@ -74,7 +129,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      fetchJobs();
+      // Jobs fetched above with sources
     }
   }, [isAuthenticated]);
 
@@ -139,8 +194,19 @@ export default function DashboardPage() {
                 : 'text-zinc-400 hover:text-white hover:bg-white/5 border border-transparent'
             }`}
           >
-            <Briefcase size={20} />
-            <span className="font-medium">Job Matches</span>
+            <Search size={20} />
+            <span className="font-medium">Find Jobs</span>
+          </button>
+          <button 
+            onClick={() => setActiveTab('applications')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+              activeTab === 'applications'
+                ? 'bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-white border border-purple-500/20' 
+                : 'text-zinc-400 hover:text-white hover:bg-white/5 border border-transparent'
+            }`}
+          >
+            <LayoutDashboard size={20} />
+            <span className="font-medium">Applications</span>
           </button>
           <button 
             onClick={() => setActiveTab('profile')}
@@ -152,6 +218,17 @@ export default function DashboardPage() {
           >
             <UserIcon size={20} />
             <span className="font-medium">Profile Settings</span>
+          </button>
+          <button 
+            onClick={() => setActiveTab('sources')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+              activeTab === 'sources'
+                ? 'bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-white border border-purple-500/20' 
+                : 'text-zinc-400 hover:text-white hover:bg-white/5 border border-transparent'
+            }`}
+          >
+            <Link2 size={20} />
+            <span className="font-medium">Job Sources</span>
           </button>
         </nav>
 
@@ -188,7 +265,9 @@ export default function DashboardPage() {
               <p className="text-zinc-400">
                 {activeTab === 'jobs' 
                   ? 'Here are your top AI-curated job matches for today.' 
-                  : 'Customize your search profile to improve your matching accuracy.'}
+                  : activeTab === 'profile' 
+                    ? 'Customize your search profile to improve your matching accuracy.'
+                    : 'Manage custom job sources for your AI agent to scrape.'}
               </p>
             </div>
             
@@ -237,7 +316,7 @@ export default function DashboardPage() {
                   </div>
                 ) : (
                   jobs.map((job) => (
-                    <div key={job.id} className="group p-5 rounded-2xl bg-white/5 border border-white/5 hover:border-purple-500/30 hover:bg-white/10 transition-all cursor-pointer flex items-center justify-between">
+                    <div key={job.id} className="relative group p-5 rounded-2xl bg-white/5 border border-white/5 hover:border-purple-500/30 hover:bg-white/10 transition-all cursor-pointer flex items-center justify-between">
                       <div className="flex items-center gap-5">
                         <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-zinc-800 to-zinc-900 border border-white/10 flex items-center justify-center text-xl font-bold shadow-lg">
                           {job.company_name?.charAt(0) || 'J'}
@@ -271,12 +350,34 @@ export default function DashboardPage() {
                           <ChevronRight size={20} className="text-zinc-400" />
                         </a>
                       </div>
+                      
+                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            api.post('/applications/', { job_id: job.id, status: 'Saved' }).then(() => {
+                              alert('Job Saved to Applications!');
+                            }).catch(err => console.error(err));
+                          }}
+                          className="w-8 h-8 rounded-full bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 flex items-center justify-center transition-colors"
+                          title="Save Job"
+                        >
+                          <Plus size={16} />
+                        </button>
+                      </div>
                     </div>
                   ))
                 )}
               </div>
             </div>
-          ) : (
+          ) : activeTab === 'applications' ? (
+            <div className="h-[calc(100vh-200px)]">
+               <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+                 <LayoutDashboard className="text-purple-400" size={24} /> Application Tracker
+               </h2>
+               <KanbanBoard />
+            </div>
+          ) : activeTab === 'profile' ? (
             <div className="rounded-3xl bg-white/5 border border-white/5 p-8 max-w-3xl">
               <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
                 <Sparkles className="text-purple-400" size={24} /> Candidate Search Profile
@@ -383,6 +484,52 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-zinc-300">College / University</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-black/20 border border-white/10 rounded-xl py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all text-sm"
+                      placeholder="Stanford University"
+                      value={profileForm.college}
+                      onChange={(e) => setProfileForm({...profileForm, college: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-zinc-300">City</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-black/20 border border-white/10 rounded-xl py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all text-sm"
+                      placeholder="San Francisco, CA"
+                      value={profileForm.city}
+                      onChange={(e) => setProfileForm({...profileForm, city: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-zinc-300">School / High School</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-black/20 border border-white/10 rounded-xl py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all text-sm"
+                      placeholder="Lincoln High"
+                      value={profileForm.school}
+                      onChange={(e) => setProfileForm({...profileForm, school: e.target.value})}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2 mt-6">
+                  <label className="text-sm font-medium text-zinc-300">Projects & Experience Details</label>
+                  <textarea 
+                    rows={4}
+                    className="w-full bg-black/20 border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all text-sm"
+                    placeholder="Describe your major projects, architectures you've built, etc."
+                    value={profileForm.projects}
+                    onChange={(e) => setProfileForm({...profileForm, projects: e.target.value})}
+                  />
+                </div>
+
                 <div className="flex justify-end pt-4">
                   <button 
                     type="submit" 
@@ -395,7 +542,103 @@ export default function DashboardPage() {
                 </div>
               </form>
             </div>
-          )}
+          ) : activeTab === 'sources' ? (
+            <div className="rounded-3xl bg-white/5 border border-white/5 p-8 max-w-4xl">
+              <div className="flex items-center justify-between mb-8">
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                  <Link2 className="text-blue-400" size={24} /> Job Sources Management
+                </h2>
+                <button 
+                  onClick={() => setShowAddSource(!showAddSource)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full text-sm font-semibold hover:opacity-90 transition-all"
+                >
+                  <Plus size={16} /> Add Source
+                </button>
+              </div>
+
+              {showAddSource && (
+                <form onSubmit={handleAddSource} className="bg-black/40 p-6 rounded-2xl border border-white/10 mb-8 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm text-zinc-400 block mb-1.5">Source Name</label>
+                      <input 
+                        required
+                        type="text" 
+                        placeholder="e.g. OpenAI Careers"
+                        className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-3 text-white focus:ring-2 focus:ring-blue-500/50"
+                        value={sourceForm.name}
+                        onChange={e => setSourceForm({...sourceForm, name: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm text-zinc-400 block mb-1.5">Source Type</label>
+                      <select 
+                        className="w-full bg-[#111] border border-white/10 rounded-xl py-2.5 px-3 text-white focus:ring-2 focus:ring-blue-500/50"
+                        value={sourceForm.source_type}
+                        onChange={e => setSourceForm({...sourceForm, source_type: e.target.value})}
+                      >
+                        <option value="company_career_page">Company Career Page</option>
+                        <option value="job_portal">Job Portal</option>
+                        <option value="direct_url">Direct Job URL</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm text-zinc-400 block mb-1.5">URL</label>
+                    <input 
+                      required
+                      type="url" 
+                      placeholder="https://..."
+                      className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-3 text-white focus:ring-2 focus:ring-blue-500/50"
+                      value={sourceForm.url}
+                      onChange={e => setSourceForm({...sourceForm, url: e.target.value})}
+                    />
+                  </div>
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button type="button" onClick={() => setShowAddSource(false)} className="px-4 py-2 rounded-xl text-zinc-400 hover:bg-white/5">Cancel</button>
+                    <button type="submit" className="px-5 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl font-semibold">Save Source</button>
+                  </div>
+                </form>
+              )}
+
+              <div className="space-y-4">
+                {fetchingSources ? (
+                  <div className="text-center py-8 text-zinc-400">Loading sources...</div>
+                ) : jobSources.length === 0 ? (
+                  <div className="text-center py-12 border border-dashed border-white/10 rounded-2xl text-zinc-500">
+                    No custom job sources added yet.
+                  </div>
+                ) : (
+                  jobSources.map(source => (
+                    <div key={source.id} className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-semibold">{source.name}</h4>
+                          <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded-md">
+                            {source.source_type.replace(/_/g, ' ')}
+                          </span>
+                        </div>
+                        <a href={source.url} target="_blank" rel="noreferrer" className="text-sm text-zinc-400 hover:text-blue-400 truncate max-w-md inline-block">
+                          {source.url}
+                        </a>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-medium mr-2">
+                          {source.is_active ? 'Active' : 'Disabled'}
+                        </div>
+                        <button className="p-2 text-zinc-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
+                          <Edit2 size={16} />
+                        </button>
+                        <button onClick={() => handleDeleteSource(source.id)} className="p-2 text-zinc-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          ) : null}
         </div>
       </main>
     </div>

@@ -6,3 +6,5 @@ from models.profile import Profile
 from models.company import Company
 from models.job import Job
 from models.employee import EmployeeProfile
+from models.job_source import JobSource
+from models.application import Application

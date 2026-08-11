@@ -70,7 +70,48 @@ def seed_jobs(
     current_user: User = Depends(deps.get_current_active_user)
 ) -> Any:
     """
-    Seed mock jobs for developer testing/preview.
+    Run LangGraph Agent Workflow to discover jobs.
     """
-    seed_mock_data(db)
-    return {"message": "Database seeded successfully with mock jobs and companies"}
+    from agents.supervisor import run_workflow
+    from models.job_source import JobSource
+    from models.job import Job
+    from crud.crud_profile import get_profile_by_user_id
+    
+    profile = get_profile_by_user_id(db, current_user.id)
+    profile_dict = {
+        "preferred_roles": profile.preferred_roles if profile else "Software Engineer",
+        "preferred_locations": profile.preferred_locations if profile else "Remote"
+    }
+    
+    # Get active job sources
+    sources = db.query(JobSource).filter(JobSource.user_id == current_user.id, JobSource.is_active == True).all()
+    urls = [s.url for s in sources]
+    
+    # Run agent workflow
+    result = run_workflow(user_profile=profile_dict, urls=urls)
+    
+    # The deduplication node has already run and populated `embedding` and returned unique jobs
+    found_jobs = result.get("jobs_found", [])
+    
+    added_count = 0
+    for j_data in found_jobs:
+        # Prevent IntegrityError by checking if URL already exists
+        existing = db.query(Job).filter(Job.job_url == j_data["job_url"]).first()
+        if existing:
+            continue
+            
+        new_job = Job(
+            title=j_data["title"],
+            description=j_data.get("description", ""),
+            location=j_data.get("location", ""),
+            salary_range=j_data.get("salary_range", ""),
+            job_url=j_data["job_url"],
+            embedding=j_data.get("embedding")
+            # For simplicity, ignoring company_id mapping for now
+        )
+        db.add(new_job)
+        added_count += 1
+        
+    db.commit()
+    
+    return {"message": f"Agent workflow completed successfully! Found and added {added_count} new unique jobs."}

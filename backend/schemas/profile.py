@@ -14,6 +14,10 @@ class ProfileBase(BaseModel):
     linkedin_url: Optional[str] = None
     github_url: Optional[str] = None
     portfolio_url: Optional[str] = None
+    college: Optional[str] = None
+    school: Optional[str] = None
+    city: Optional[str] = None
+    projects: Optional[str] = None
 
 # Properties to receive via API on update
 class ProfileUpdate(ProfileBase):

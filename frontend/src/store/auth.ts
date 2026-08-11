@@ -19,6 +19,10 @@ interface Profile {
   linkedin_url: string;
   github_url: string;
   portfolio_url: string;
+  college: string;
+  school: string;
+  city: string;
+  projects: string;
 }
 
 interface AuthState {
@@ -36,7 +40,7 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   profile: null,
-  token: typeof window !== 'undefined' ? localStorage.getItem('token') : null,
+  token: null,
   isAuthenticated: false,
 
   login: (token: string) => {

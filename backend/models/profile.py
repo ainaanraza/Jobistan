@@ -18,5 +18,9 @@ class Profile(Base):
     linkedin_url = Column(String, nullable=True)
     github_url = Column(String, nullable=True)
     portfolio_url = Column(String, nullable=True)
+    college = Column(String, nullable=True)
+    school = Column(String, nullable=True)
+    city = Column(String, nullable=True)
+    projects = Column(Text, nullable=True)
 
     user = relationship("User", backref="profile")

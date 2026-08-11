@@ -14,9 +14,7 @@ class Job(Base):
     salary_range = Column(String, nullable=True)
     job_url = Column(String, unique=True, nullable=False)
     
-    # We use 1536 dimensions for OpenAI embeddings (text-embedding-3-small)
-    # or 768 for Gemini embeddings (text-embedding-004)
-    # Let's use 768 since Gemini is free as per user request
-    embedding = Column(Vector(768), nullable=True) 
+    # We use 1536 dimensions for OpenAI embeddings (text-embedding-3-small/ada-002)
+    embedding = Column(Vector(1536), nullable=True) 
 
     company = relationship("Company", backref="jobs")

@@ -5,7 +5,7 @@ from models.company import Company
 
 def get_jobs(db: Session, skip: int = 0, limit: int = 100) -> List[Job]:
     # Query jobs and eagerly load company relationship
-    return db.query(Job).offset(skip).limit(limit).all()
+    return db.query(Job).order_by(Job.id.desc()).offset(skip).limit(limit).all()
 
 def seed_mock_data(db: Session):
     # Check if we already have jobs
