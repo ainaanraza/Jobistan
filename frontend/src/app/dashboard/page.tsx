@@ -42,12 +42,78 @@ export default function DashboardPage() {
   const [jobSources, setJobSources] = useState<any[]>([]);
   const [fetchingSources, setFetchingSources] = useState(false);
   const [showAddSource, setShowAddSource] = useState(false);
-  const [sourceForm, setSourceForm] = useState({ name: '', url: '', source_type: 'company_career_page' });
+  const [sourceForm, setSourceForm] = useState({ 
+    name: '', 
+    url: '', 
+    source_type: 'CAREER_PAGE',
+    configuration: {
+      portal: 'Indeed',
+      query: '',
+      location: '',
+      experience: '',
+      remote: false,
+      date_posted: '',
+      raw_params: {}
+    }
+  });
+
+  const parseIndeedUrl = (url: string) => {
+    try {
+      const parsed = new URL(url);
+      if (parsed.hostname.includes('indeed.com')) {
+        const query = parsed.searchParams.get('q') || '';
+        const location = parsed.searchParams.get('l') || '';
+        
+        const raw_params: Record<string, string> = {};
+        parsed.searchParams.forEach((value, key) => {
+          if (key !== 'q' && key !== 'l') {
+            raw_params[key] = value;
+          }
+        });
+        
+        setSourceForm(prev => ({
+          ...prev,
+          url,
+          configuration: {
+            ...prev.configuration,
+            portal: 'Indeed',
+            query,
+            location,
+            raw_params
+          }
+        }));
+      } else {
+        setSourceForm(prev => ({ ...prev, url }));
+      }
+    } catch {
+      setSourceForm(prev => ({ ...prev, url }));
+    }
+  };
+
+  const handleTestSource = async (url: string) => {
+    try {
+      setTestResult(null);
+      alert(`Testing source: ${url}\nThis may take a moment if it needs to launch a browser...`);
+      const response = await api.post('/ingestion/test-source', { url });
+      setTestResult(response.data);
+    } catch (error) {
+      console.error('Failed to test source', error);
+      alert('Failed to test source. See console.');
+    }
+  };
+
+  const [testResult, setTestResult] = useState<any>(null);
 
   useEffect(() => {
     const init = async () => {
-      await fetchUser();
-      await fetchProfile();
+      const token = localStorage.getItem('token');
+      if (token) {
+        useAuthStore.setState({ token, isAuthenticated: true });
+        await fetchUser();
+        if (useAuthStore.getState().isAuthenticated) {
+          await fetchProfile();
+        }
+      }
       setLoading(false);
     };
     init();
@@ -91,7 +157,20 @@ export default function DashboardPage() {
     e.preventDefault();
     try {
       await api.post('/sources/', sourceForm);
-      setSourceForm({ name: '', url: '', source_type: 'company_career_page' });
+      setSourceForm({ 
+        name: '', 
+        url: '', 
+        source_type: 'CAREER_PAGE',
+        configuration: {
+          portal: 'Indeed',
+          query: '',
+          location: '',
+          experience: '',
+          remote: false,
+          date_posted: '',
+          raw_params: {}
+        }
+      });
       setShowAddSource(false);
       fetchJobSources();
     } catch (error) {
@@ -133,6 +212,12 @@ export default function DashboardPage() {
     }
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    if (!loading && (!isAuthenticated || !user)) {
+      router.push('/login');
+    }
+  }, [loading, isAuthenticated, user, router]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#050505] flex items-center justify-center">
@@ -142,7 +227,6 @@ export default function DashboardPage() {
   }
 
   if (!isAuthenticated || !user) {
-    router.push('/login');
     return null;
   }
 
@@ -556,6 +640,31 @@ export default function DashboardPage() {
                 </button>
               </div>
 
+              {testResult && (
+                <div className={`mb-8 p-6 rounded-2xl border ${testResult.status === 'SUCCESS' ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+                  <h3 className="font-bold text-lg mb-2 flex items-center gap-2">
+                    {testResult.status === 'SUCCESS' ? '✅ Source Test Successful' : '❌ Source Test Failed'}
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm mt-4">
+                    <div><span className="text-zinc-400">URL:</span> {testResult.url}</div>
+                    <div><span className="text-zinc-400">Detected Adapter:</span> <span className="text-purple-400 font-mono">{testResult.detected_platform}</span></div>
+                    <div><span className="text-zinc-400">Jobs Found:</span> <span className="font-bold">{testResult.jobs_found}</span></div>
+                    {testResult.error && <div className="col-span-2 text-red-400 mt-2">{testResult.error}</div>}
+                  </div>
+                  {testResult.sample_jobs && testResult.sample_jobs.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-white/10">
+                      <p className="text-sm font-medium mb-2 text-zinc-400">Sample Extracted Job:</p>
+                      <pre className="bg-black/50 p-3 rounded-lg text-xs overflow-x-auto text-blue-300">
+                        {JSON.stringify(testResult.sample_jobs[0], null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                  <button onClick={() => setTestResult(null)} className="mt-4 px-4 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-sm transition-colors">
+                    Dismiss
+                  </button>
+                </div>
+              )}
+
               {showAddSource && (
                 <form onSubmit={handleAddSource} className="bg-black/40 p-6 rounded-2xl border border-white/10 mb-8 space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -577,21 +686,123 @@ export default function DashboardPage() {
                         value={sourceForm.source_type}
                         onChange={e => setSourceForm({...sourceForm, source_type: e.target.value})}
                       >
-                        <option value="company_career_page">Company Career Page</option>
-                        <option value="job_portal">Job Portal</option>
-                        <option value="direct_url">Direct Job URL</option>
+                        <option value="CAREER_PAGE">Company Career Page</option>
+                        <option value="JOB_PORTAL">Job Portal</option>
+                        <option value="ATS">ATS</option>
+                        <option value="DIRECT_JOB">Direct Job URL</option>
                       </select>
                     </div>
                   </div>
+                  
+                  {sourceForm.source_type === 'JOB_PORTAL' && (
+                    <div className="p-4 bg-black/20 rounded-xl border border-white/5 space-y-4">
+                      <h4 className="text-sm font-semibold text-purple-400">Portal Configuration</h4>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs text-zinc-400 block mb-1">Portal Platform</label>
+                          <select 
+                            className="w-full bg-[#111] border border-white/10 rounded-lg py-2 px-3 text-white text-sm"
+                            value={sourceForm.configuration.portal}
+                            onChange={e => setSourceForm({
+                              ...sourceForm, 
+                              configuration: {...sourceForm.configuration, portal: e.target.value}
+                            })}
+                          >
+                            <option value="Indeed">Indeed</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs text-zinc-400 block mb-1">Keywords (Query)</label>
+                          <input 
+                            type="text" 
+                            className="w-full bg-[#111] border border-white/10 rounded-lg py-2 px-3 text-white text-sm"
+                            value={sourceForm.configuration.query}
+                            onChange={e => setSourceForm({
+                              ...sourceForm, 
+                              configuration: {...sourceForm.configuration, query: e.target.value}
+                            })}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-zinc-400 block mb-1">Location</label>
+                          <input 
+                            type="text" 
+                            className="w-full bg-[#111] border border-white/10 rounded-lg py-2 px-3 text-white text-sm"
+                            value={sourceForm.configuration.location}
+                            onChange={e => setSourceForm({
+                              ...sourceForm, 
+                              configuration: {...sourceForm.configuration, location: e.target.value}
+                            })}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-zinc-400 block mb-1">Experience Level</label>
+                          <input 
+                            type="text" 
+                            className="w-full bg-[#111] border border-white/10 rounded-lg py-2 px-3 text-white text-sm"
+                            value={sourceForm.configuration.experience}
+                            onChange={e => setSourceForm({
+                              ...sourceForm, 
+                              configuration: {...sourceForm.configuration, experience: e.target.value}
+                            })}
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-4">
+                        <label className="flex items-center gap-2 text-sm text-zinc-300">
+                          <input 
+                            type="checkbox" 
+                            checked={sourceForm.configuration.remote}
+                            onChange={e => setSourceForm({
+                              ...sourceForm, 
+                              configuration: {...sourceForm.configuration, remote: e.target.checked}
+                            })}
+                            className="rounded bg-[#111] border-white/10 text-purple-500 focus:ring-purple-500/50"
+                          />
+                          Remote Only
+                        </label>
+                        
+                        <div className="flex-1">
+                          <label className="text-xs text-zinc-400 block mb-1">Date Posted</label>
+                          <select 
+                            className="w-full bg-[#111] border border-white/10 rounded-lg py-2 px-3 text-white text-sm"
+                            value={sourceForm.configuration.date_posted}
+                            onChange={e => setSourceForm({
+                              ...sourceForm, 
+                              configuration: {...sourceForm.configuration, date_posted: e.target.value}
+                            })}
+                          >
+                            <option value="">Any Time</option>
+                            <option value="24h">Past 24 Hours</option>
+                            <option value="3d">Past 3 Days</option>
+                            <option value="7d">Past 7 Days</option>
+                            <option value="14d">Past 14 Days</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="text-xs text-zinc-500">
+                        * Note: Raw parameters extracted from pasted URLs are preserved automatically.
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <label className="text-sm text-zinc-400 block mb-1.5">URL</label>
                     <input 
                       required
                       type="url" 
-                      placeholder="https://..."
+                      placeholder={sourceForm.source_type === 'JOB_PORTAL' ? "Paste Indeed Search URL to auto-fill..." : "https://..."}
                       className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-3 text-white focus:ring-2 focus:ring-blue-500/50"
                       value={sourceForm.url}
-                      onChange={e => setSourceForm({...sourceForm, url: e.target.value})}
+                      onChange={e => {
+                        if (sourceForm.source_type === 'JOB_PORTAL') {
+                          parseIndeedUrl(e.target.value);
+                        } else {
+                          setSourceForm({...sourceForm, url: e.target.value})
+                        }
+                      }}
                     />
                   </div>
                   <div className="flex justify-end gap-3 pt-2">
@@ -610,28 +821,50 @@ export default function DashboardPage() {
                   </div>
                 ) : (
                   jobSources.map(source => (
-                    <div key={source.id} className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-semibold">{source.name}</h4>
-                          <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded-md">
-                            {source.source_type.replace(/_/g, ' ')}
-                          </span>
+                    <div key={source.id} className="flex flex-col p-5 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-semibold text-lg">{source.name}</h4>
+                            <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded-md">
+                              {source.source_type.replace(/_/g, ' ')}
+                            </span>
+                            {source.last_error && (
+                              <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 bg-red-500/20 text-red-300 rounded-md" title={source.last_error}>
+                                ERROR
+                              </span>
+                            )}
+                          </div>
+                          <a href={source.url} target="_blank" rel="noreferrer" className="text-sm text-zinc-400 hover:text-blue-400 truncate max-w-md inline-block">
+                            {source.url}
+                          </a>
                         </div>
-                        <a href={source.url} target="_blank" rel="noreferrer" className="text-sm text-zinc-400 hover:text-blue-400 truncate max-w-md inline-block">
-                          {source.url}
-                        </a>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => handleTestSource(source.url)} className="px-3 py-1.5 text-xs font-semibold bg-purple-600 hover:bg-purple-500 rounded-lg transition-colors">
+                            Test Source
+                          </button>
+                          <button onClick={() => handleDeleteSource(source.id)} className="p-2 text-zinc-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors" title="Delete">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <div className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-medium mr-2">
-                          {source.is_active ? 'Active' : 'Disabled'}
+                      
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2 pt-3 border-t border-white/5 text-xs">
+                        <div>
+                          <p className="text-zinc-500 mb-0.5">Last Checked</p>
+                          <p className="font-mono text-zinc-300">{source.last_checked_at ? new Date(source.last_checked_at).toLocaleString() : 'Never'}</p>
                         </div>
-                        <button className="p-2 text-zinc-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
-                          <Edit2 size={16} />
-                        </button>
-                        <button onClick={() => handleDeleteSource(source.id)} className="p-2 text-zinc-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors">
-                          <Trash2 size={16} />
-                        </button>
+                        <div>
+                          <p className="text-zinc-500 mb-0.5">Last Success</p>
+                          <p className="font-mono text-emerald-400/80">{source.last_success_at ? new Date(source.last_success_at).toLocaleString() : 'Never'}</p>
+                        </div>
+                        <div className="col-span-2">
+                          <p className="text-zinc-500 mb-0.5">Source Sync Status</p>
+                          <p className="text-zinc-300">
+                            {source.content_hash ? 'Synced successfully.' : 'Pending initial sync.'} 
+                            {source.last_error && <span className="text-red-400 ml-2">Error during last run.</span>}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   ))

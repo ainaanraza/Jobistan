@@ -42,12 +42,12 @@ def generate_cover_letter(profile_dict: dict, job_title: str, job_company: str, 
             "Keep it professional, engaging, and ready to send. Output ONLY the cover letter text, no intro or outro."
         )
         
-        interaction = client.interactions.create(
-            model="gemini-3.6-flash",
-            input=prompt
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
         )
         
-        return interaction.output_text
+        return response.text
     except Exception as e:
         print(f"Failed to generate cover letter: {e}")
         return f"MOCK COVER LETTER: Generating failed due to an API error ({e})."
@@ -74,21 +74,23 @@ def extract_jobs_from_text(page_text: str, base_url: str, user_profile: dict) ->
             "Extract all job listings from the text that match the user's preferred roles. "
             "For each job, extract:\n"
             "- 'title': The job title\n"
-            "- 'job_url': The full absolute URL to apply for the job (if relative, combine it with the base URL)\n"
+            "- 'company': The hiring company's actual name (not the job board or source URL). Distinguish the real hiring company from the generic portal.\n"
+            "- 'job_url': The precise, specific absolute URL to apply for THIS individual job. Match the job title with the exact href from the PAGE LINKS. If you absolutely cannot find a specific link, return null.\n"
             "- 'location': The job location\n"
             "- 'salary_range': The salary range if mentioned, else 'Undisclosed'\n"
-            "- 'description': A short 1-2 sentence description if available, else 'Discovered via AI Scraper'\n\n"
+            "- 'description': A short 1-2 sentence description if available, else 'Discovered via AI Scraper'\n"
+            "- 'confidence': A float between 0.0 and 1.0 indicating your confidence in this extraction based on data completeness and clarity.\n\n"
             "Return the result ONLY as a raw JSON array of objects. Do not wrap it in markdown block quotes (```json) or any other text.\n\n"
             f"Page Content:\n{page_text[:30000]}" # Truncate to avoid context window limits
         )
         
-        interaction = client.interactions.create(
-            model="gemini-3.6-flash",
-            input=prompt
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
         )
         
         # Parse the JSON response
-        response_text = interaction.output_text.strip()
+        response_text = response.text.strip()
         # Clean up any potential markdown formatting the AI might add despite instructions
         if response_text.startswith("```json"):
             response_text = response_text[7:]

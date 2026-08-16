@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
 from api.router import api_router
+import db.base # Ensure all models are imported and registered with SQLAlchemy
 
 from contextlib import asynccontextmanager
 from core.scheduler import start_scheduler, shutdown_scheduler

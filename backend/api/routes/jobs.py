@@ -72,10 +72,31 @@ def seed_jobs(
     """
     Run LangGraph Agent Workflow to discover jobs.
     """
-    from agents.supervisor import run_workflow
+    from core.ingestion.manager import IngestionManager
     from models.job_source import JobSource
-    from models.job import Job
+    
+    manager = IngestionManager()
+    
+    # Get active job sources
+    sources = db.query(JobSource).filter(JobSource.user_id == current_user.id, JobSource.is_active == True).all()
+    
+    results = []
+    total_new = 0
+    total_updated = 0
+    
+    # 1. Process deterministic sources via IngestionManager
+    for source in sources:
+        summary = manager.process_source(db, source)
+        results.append(summary)
+        total_new += summary.get("new", 0)
+        total_updated += summary.get("updated", 0)
+        
+    # 2. (Optional/Background) Run the old AI agent workflow for broad searches
+    # To keep it fast, we can either queue it or just let it run if there are no URLs
+    # Since instructions say "don't delete it, make it one source", we'll run it on empty URLs or general broad queries.
+    from agents.supervisor import run_workflow
     from crud.crud_profile import get_profile_by_user_id
+    from models.job import Job
     
     profile = get_profile_by_user_id(db, current_user.id)
     profile_dict = {
@@ -83,35 +104,36 @@ def seed_jobs(
         "preferred_locations": profile.preferred_locations if profile else "Remote"
     }
     
-    # Get active job sources
-    sources = db.query(JobSource).filter(JobSource.user_id == current_user.id, JobSource.is_active == True).all()
-    urls = [s.url for s in sources]
-    
-    # Run agent workflow
-    result = run_workflow(user_profile=profile_dict, urls=urls)
-    
-    # The deduplication node has already run and populated `embedding` and returned unique jobs
-    found_jobs = result.get("jobs_found", [])
-    
-    added_count = 0
-    for j_data in found_jobs:
-        # Prevent IntegrityError by checking if URL already exists
-        existing = db.query(Job).filter(Job.job_url == j_data["job_url"]).first()
-        if existing:
-            continue
-            
-        new_job = Job(
-            title=j_data["title"],
-            description=j_data.get("description", ""),
-            location=j_data.get("location", ""),
-            salary_range=j_data.get("salary_range", ""),
-            job_url=j_data["job_url"],
-            embedding=j_data.get("embedding")
-            # For simplicity, ignoring company_id mapping for now
-        )
-        db.add(new_job)
-        added_count += 1
+    # Only run AI workflow for generic queries (empty URLs list triggers DuckDuckGo search)
+    # The previous code passed all URLs to AI. We now handle URLs deterministically.
+    try:
+        ai_result = run_workflow(user_profile=profile_dict, urls=[])
+        found_jobs = ai_result.get("jobs_found", [])
         
-    db.commit()
+        for j_data in found_jobs:
+            existing = db.query(Job).filter(Job.job_url == j_data["job_url"]).first()
+            if existing:
+                continue
+                
+            new_job = Job(
+                title=j_data["title"],
+                description=j_data.get("description", ""),
+                location=j_data.get("location", ""),
+                salary_range=j_data.get("salary_range", ""),
+                job_url=j_data["job_url"],
+                embedding=j_data.get("embedding"),
+                source_type="AI_Search",
+                source_name="DuckDuckGo",
+                is_active=True
+            )
+            db.add(new_job)
+            total_new += 1
+            
+        db.commit()
+    except Exception as e:
+        print(f"AI search fallback failed: {e}")
     
-    return {"message": f"Agent workflow completed successfully! Found and added {added_count} new unique jobs."}
+    return {
+        "message": f"Ingestion completed. Found {total_new} new jobs and updated {total_updated}.",
+        "source_results": results
+    }
