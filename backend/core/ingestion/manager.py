@@ -5,6 +5,20 @@ from core.ingestion.adapters.lever import LeverAdapter
 from core.ingestion.adapters.ashby import AshbyAdapter
 from core.ingestion.adapters.generic import GenericAdapter
 from core.ingestion.adapters.indeed import IndeedAdapter
+from core.ingestion.adapters.linkedin import LinkedInAdapter
+from core.ingestion.adapters.glassdoor import GlassdoorAdapter
+from core.ingestion.adapters.ziprecruiter import ZipRecruiterAdapter
+from core.ingestion.adapters.careerbuilder import CareerBuilderAdapter
+from core.ingestion.adapters.naukri import NaukriAdapter
+from core.ingestion.adapters.foundit import FounditAdapter
+from core.ingestion.adapters.apna import ApnaAdapter
+from core.ingestion.adapters.shine import ShineAdapter
+from core.ingestion.adapters.timesjobs import TimesJobsAdapter
+from core.ingestion.adapters.workindia import WorkIndiaAdapter
+from core.ingestion.adapters.instahyre import InstahyreAdapter
+from core.ingestion.adapters.wellfound import WellfoundAdapter
+from core.ingestion.adapters.flexjobs import FlexJobsAdapter
+from core.ingestion.adapters.internshala import InternshalaAdapter
 import hashlib
 import json
 import datetime
@@ -17,6 +31,20 @@ class IngestionManager:
         # Register adapters in order of preference
         self.adapters: List[JobSourceAdapter] = [
             IndeedAdapter(),
+            LinkedInAdapter(),
+            GlassdoorAdapter(),
+            ZipRecruiterAdapter(),
+            CareerBuilderAdapter(),
+            NaukriAdapter(),
+            FounditAdapter(),
+            ApnaAdapter(),
+            ShineAdapter(),
+            TimesJobsAdapter(),
+            WorkIndiaAdapter(),
+            InstahyreAdapter(),
+            WellfoundAdapter(),
+            FlexJobsAdapter(),
+            InternshalaAdapter(),
             GreenhouseAdapter(),
             LeverAdapter(),
             AshbyAdapter(),

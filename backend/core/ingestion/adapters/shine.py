@@ -1,14 +1,13 @@
-from typing import Dict, Any, List
+from typing import Dict, Any
 from urllib.parse import urlparse, parse_qs
-import time
-from core.ingestion.base import FetchResult, IngestionDiagnostics
+from core.ingestion.base import FetchResult
 from core.ingestion.base_portal import JobPortalAdapter
 
-class IndeedAdapter(JobPortalAdapter):
+class ShineAdapter(JobPortalAdapter):
     @classmethod
     def can_handle(cls, url: str) -> bool:
         parsed = urlparse(url)
-        return parsed.netloc == "indeed.com" or parsed.netloc.endswith(".indeed.com")
+        return "shine" in parsed.netloc
 
     def parse_search_config(self, url: str) -> Dict[str, Any]:
         parsed = urlparse(url)
@@ -27,7 +26,7 @@ class IndeedAdapter(JobPortalAdapter):
             val = values[0]
             if key == "q":
                 config["query"] = val
-            elif key == "l":
+            elif key == "loc":
                 config["location"] = val
             else:
                 config["raw_params"][key] = val
@@ -38,4 +37,4 @@ class IndeedAdapter(JobPortalAdapter):
         return True
 
     def fetch_jobs(self, url: str) -> FetchResult:
-        return self._default_fetch_jobs(url, "Indeed", ["vjk", "jk"])
+        return self._default_fetch_jobs(url, "Shine", ['jobid'])
