@@ -67,7 +67,15 @@ class JobPortalAdapter(JobSourceAdapter, ABC):
                     res = page.goto(url, wait_until="networkidle", timeout=30000)
                     if res:
                         diagnostics.http_status = res.status
-                        if res.status in (403, 429) or 'cloudflare' in page.content().lower() or 'captcha' in page.content().lower() or 'security block' in page.content().lower():
+                        content_lower = page.content().lower()
+                        title_lower = page.title().lower()
+                        is_blocked = (
+                            res.status in (403, 429) or 
+                            'access denied' in title_lower or 
+                            'attention required! | cloudflare' in title_lower or
+                            'please verify you are a human' in content_lower
+                        )
+                        if is_blocked:
                             diagnostics.status = "ACCESS_BLOCKED"
                             diagnostics.errors.append(f"{portal_name} access is blocked by anti-bot protections or rate limits.")
                             return FetchResult(jobs=[], diagnostics=diagnostics)

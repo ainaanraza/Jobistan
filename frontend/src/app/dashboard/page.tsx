@@ -57,16 +57,64 @@ export default function DashboardPage() {
     }
   });
 
-  const parseIndeedUrl = (url: string) => {
+  const parsePortalUrl = (url: string) => {
     try {
       const parsed = new URL(url);
-      if (parsed.hostname.includes('indeed.com')) {
-        const query = parsed.searchParams.get('q') || '';
-        const location = parsed.searchParams.get('l') || '';
+      const host = parsed.hostname;
+      
+      const portalConfig: Record<string, {name: string, q: string, l: string}> = {
+        'indeed.com': { name: 'Indeed', q: 'q', l: 'l' },
+        'linkedin.com': { name: 'LinkedIn', q: 'keywords', l: 'location' },
+        'glassdoor.com': { name: 'Glassdoor', q: 'sc.keyword', l: 'sc.location' },
+        'ziprecruiter.com': { name: 'ZipRecruiter', q: 'search', l: 'location' },
+        'careerbuilder.com': { name: 'CareerBuilder', q: 'keywords', l: 'location' },
+        'naukri.com': { name: 'Naukri', q: 'keyword', l: 'location' },
+        'foundit.in': { name: 'Foundit', q: 'query', l: 'location' },
+        'apna.co': { name: 'Apna', q: 'text', l: 'location' },
+        'shine.com': { name: 'Shine', q: 'q', l: 'loc' },
+        'timesjobs.com': { name: 'TimesJobs', q: 'search', l: 'location' },
+        'workindia.in': { name: 'WorkIndia', q: 'query', l: 'city' },
+        'instahyre.com': { name: 'Instahyre', q: 'search', l: 'location' },
+        'wellfound.com': { name: 'Wellfound', q: 'search', l: 'location' },
+        'flexjobs.com': { name: 'FlexJobs', q: 'search', l: 'location' },
+        'internshala.com': { name: 'Internshala', q: 'keyword', l: 'location' }
+      };
+
+      let matchedConfig = null;
+      for (const [domain, config] of Object.entries(portalConfig)) {
+        if (host.includes(domain)) {
+          matchedConfig = config;
+          break;
+        }
+      }
+
+      if (matchedConfig) {
+        let query = parsed.searchParams.get(matchedConfig.q) || '';
+        let location = parsed.searchParams.get(matchedConfig.l) || '';
+        
+        // Handle path-based search queries for Naukri and Internshala
+        if (!query && !location) {
+          const path = parsed.pathname;
+          if (host.includes('naukri.com')) {
+            // e.g. /software-engineer-jobs-in-bangalore
+            const match = path.match(/^\/([^/]+)-jobs(-in-([^/]+))?$/);
+            if (match) {
+              query = match[1].replace(/-/g, ' ');
+              if (match[3]) location = match[3].replace(/-/g, ' ');
+            }
+          } else if (host.includes('internshala.com')) {
+            // e.g. /internships/software-engineering-internship-in-bangalore
+            const match = path.match(/^\/internships\/([^/]+)-internship(-in-([^/]+))?\/?$/);
+            if (match) {
+              query = match[1].replace(/-/g, ' ');
+              if (match[3]) location = match[3].replace(/-/g, ' ');
+            }
+          }
+        }
         
         const raw_params: Record<string, string> = {};
         parsed.searchParams.forEach((value, key) => {
-          if (key !== 'q' && key !== 'l') {
+          if (key !== matchedConfig.q && key !== matchedConfig.l) {
             raw_params[key] = value;
           }
         });
@@ -76,7 +124,7 @@ export default function DashboardPage() {
           url,
           configuration: {
             ...prev.configuration,
-            portal: 'Indeed',
+            portal: matchedConfig.name,
             query,
             location,
             raw_params
@@ -710,6 +758,20 @@ export default function DashboardPage() {
                             })}
                           >
                             <option value="Indeed">Indeed</option>
+                            <option value="LinkedIn">LinkedIn</option>
+                            <option value="Glassdoor">Glassdoor</option>
+                            <option value="ZipRecruiter">ZipRecruiter</option>
+                            <option value="CareerBuilder">CareerBuilder</option>
+                            <option value="Naukri">Naukri</option>
+                            <option value="Foundit">Foundit</option>
+                            <option value="Apna">Apna</option>
+                            <option value="Shine">Shine</option>
+                            <option value="TimesJobs">TimesJobs</option>
+                            <option value="WorkIndia">WorkIndia</option>
+                            <option value="Instahyre">Instahyre</option>
+                            <option value="Wellfound">Wellfound</option>
+                            <option value="FlexJobs">FlexJobs</option>
+                            <option value="Internshala">Internshala</option>
                           </select>
                         </div>
                         <div>
@@ -793,12 +855,12 @@ export default function DashboardPage() {
                     <input 
                       required
                       type="url" 
-                      placeholder={sourceForm.source_type === 'JOB_PORTAL' ? "Paste Indeed Search URL to auto-fill..." : "https://..."}
+                      placeholder={sourceForm.source_type === 'JOB_PORTAL' ? "Paste Job Search URL to auto-fill..." : "https://..."}
                       className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-3 text-white focus:ring-2 focus:ring-blue-500/50"
                       value={sourceForm.url}
                       onChange={e => {
                         if (sourceForm.source_type === 'JOB_PORTAL') {
-                          parseIndeedUrl(e.target.value);
+                          parsePortalUrl(e.target.value);
                         } else {
                           setSourceForm({...sourceForm, url: e.target.value})
                         }
