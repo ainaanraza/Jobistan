@@ -36,5 +36,5 @@ class WorkIndiaAdapter(JobPortalAdapter):
     def validate_source(self) -> bool:
         return True
 
-    def fetch_jobs(self, url: str) -> FetchResult:
+    def fetch_jobs(self, url: str, db=None, source_id=None) -> FetchResult:
         return self._default_fetch_jobs(url, "WorkIndia", ['job_id'])

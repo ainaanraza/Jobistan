@@ -11,3 +11,4 @@ from models.application import Application
 from models.canonical_job import CanonicalJob
 from models.user_profile import UserProfile
 from models.job_match import JobMatch
+from models.scraper_rule import ScraperRule

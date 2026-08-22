@@ -24,7 +24,7 @@ class JobPortalAdapter(JobSourceAdapter, ABC):
         pass
         
     @abstractmethod
-    def fetch_jobs(self, url: str) -> FetchResult:
+    def fetch_jobs(self, url: str, db=None, source_id=None) -> FetchResult:
         """Fetch jobs based on the portal URL."""
         pass
 

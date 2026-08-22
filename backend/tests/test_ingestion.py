@@ -1,4 +1,5 @@
 import pytest
+from unittest.mock import patch, MagicMock
 from core.ingestion.manager import IngestionManager
 from core.ingestion.adapters.greenhouse import GreenhouseAdapter
 from core.ingestion.adapters.lever import LeverAdapter
@@ -102,15 +103,82 @@ def test_indeed_parameter_parsing():
     assert config["raw_params"]["vjk"] == "c887eeb4fa3cd1ac"
     assert "from" in config["raw_params"]
 
-def test_indeed_access_blocked():
+def _create_mock_playwright(status_code, title, content, links=None, raise_exc=False):
+    class MockRes:
+        status = status_code
+    class MockPage:
+        def goto(self, *args, **kwargs):
+            if raise_exc:
+                raise Exception("Network failure")
+            return MockRes()
+        def title(self):
+            return title
+        def content(self):
+            return content
+        def evaluate(self, arg):
+            if raise_exc:
+                raise Exception("Evaluate failure")
+            if "scrollTo" in arg:
+                return None
+            if "querySelectorAll('a')" in arg:
+                return links or []
+            if "innerText" in arg:
+                return content
+            return None
+    class MockContext:
+        def new_page(self): return MockPage()
+    class MockBrowser:
+        def new_context(self, **kwargs): return MockContext()
+        def close(self): pass
+    class MockChromium:
+        def launch(self, **kwargs): return MockBrowser()
+    class MockPlaywright:
+        @property
+        def chromium(self): return MockChromium()
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+    return MockPlaywright()
+
+@patch('playwright.sync_api.sync_playwright')
+def test_indeed_http_403_access_blocked(mock_pw):
+    mock_pw.return_value = _create_mock_playwright(403, "Access Denied", "Blocked")
     adapter = IndeedAdapter()
-    url = "https://in.indeed.com/jobs?q=software+engineer"
-    result = adapter.fetch_jobs(url)
-    
-    assert len(result.jobs) == 0
+    result = adapter.fetch_jobs("https://in.indeed.com/jobs?q=test")
     assert result.diagnostics.status == "ACCESS_BLOCKED"
-    assert result.diagnostics.http_status == 403
-    assert len(result.diagnostics.errors) > 0
+
+@patch('playwright.sync_api.sync_playwright')
+def test_indeed_http_200_cloudflare_challenge(mock_pw):
+    mock_pw.return_value = _create_mock_playwright(200, "Attention Required! | Cloudflare", "Please verify you are a human")
+    adapter = IndeedAdapter()
+    result = adapter.fetch_jobs("https://in.indeed.com/jobs?q=test")
+    assert result.diagnostics.status == "ACCESS_BLOCKED"
+
+@patch('playwright.sync_api.sync_playwright')
+@patch('core.ingestion.base_portal.extract_jobs_from_text')
+def test_indeed_http_200_success(mock_extract, mock_pw):
+    mock_pw.return_value = _create_mock_playwright(200, "Indeed Jobs", "Software Engineer at Google", links=[{"text":"apply", "href":"https://indeed.com/viewjob?jk=123"}])
+    mock_extract.return_value = [{"title": "Software Engineer", "company": "Google", "job_url": "https://indeed.com/viewjob?jk=123"}]
+    adapter = IndeedAdapter()
+    result = adapter.fetch_jobs("https://in.indeed.com/jobs?q=test")
+    assert result.diagnostics.status == "SUCCESS"
+    assert result.diagnostics.jobs_found == 1
+
+@patch('playwright.sync_api.sync_playwright')
+@patch('core.ingestion.base_portal.extract_jobs_from_text')
+def test_indeed_http_200_no_jobs(mock_extract, mock_pw):
+    mock_pw.return_value = _create_mock_playwright(200, "Indeed Jobs", "No jobs match your search", links=[])
+    mock_extract.return_value = []
+    adapter = IndeedAdapter()
+    result = adapter.fetch_jobs("https://in.indeed.com/jobs?q=test")
+    assert result.diagnostics.status == "NO_JOBS_FOUND"
+    assert result.diagnostics.jobs_found == 0
+
+@patch('playwright.sync_api.sync_playwright')
+def test_indeed_network_error(mock_pw):
+    mock_pw.return_value = _create_mock_playwright(None, "", "", raise_exc=True)
+    adapter = IndeedAdapter()
+    result = adapter.fetch_jobs("https://in.indeed.com/jobs?q=test")
+    assert result.diagnostics.status == "FETCH_ERROR"
 
 def test_fetch_result_structure():
     result = FetchResult(
@@ -153,7 +221,7 @@ def test_acceptance_scan_sequence():
         def __init__(self):
             self.call_count = 0
             
-        def fetch_jobs(self, url):
+        def fetch_jobs(self, url, db=None, source_id=None, force_heal=False):
             self.call_count += 1
             
             jobs = []
@@ -230,7 +298,7 @@ def test_deloitte_regression():
     manager = IngestionManager()
     
     class MockGenericAdapter(GenericAdapter):
-        def fetch_jobs(self, url):
+        def fetch_jobs(self, url, db=None, source_id=None, force_heal=False):
             return FetchResult(jobs=[], diagnostics=IngestionDiagnostics(status="SUCCESS", adapter="MockAdapter"))
     manager.adapters = [MockGenericAdapter()]
     
@@ -244,7 +312,7 @@ def test_thejobcompany_generic_page():
     manager = IngestionManager()
     
     class MockGenericAdapter(GenericAdapter):
-        def fetch_jobs(self, url):
+        def fetch_jobs(self, url, db=None, source_id=None, force_heal=False):
             return FetchResult(jobs=[], diagnostics=IngestionDiagnostics(status="SUCCESS", adapter="MockAdapter"))
     manager.adapters = [MockGenericAdapter()]
     

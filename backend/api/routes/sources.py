@@ -81,3 +81,23 @@ def delete_job_source(
     db.delete(source)
     db.commit()
     return source
+
+@router.post("/{id}/repair")
+def repair_job_source(
+    *,
+    db: Session = Depends(deps.get_db),
+    id: int,
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Manually trigger self-healing for a source.
+    """
+    source = db.query(JobSourceModel).filter(JobSourceModel.id == id, JobSourceModel.user_id == current_user.id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Job source not found")
+        
+    from core.ingestion.manager import IngestionManager
+    manager = IngestionManager()
+    
+    result = manager.process_source(db, source, force_heal=True)
+    return result

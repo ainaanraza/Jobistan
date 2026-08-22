@@ -9,7 +9,7 @@ class GreenhouseAdapter(JobSourceAdapter):
     def can_handle(cls, url: str) -> bool:
         return "boards.greenhouse.io" in url or "boards-api.greenhouse.io" in url
 
-    def fetch_jobs(self, url: str) -> FetchResult:
+    def fetch_jobs(self, url: str, db=None, source_id=None) -> FetchResult:
         import time
         start_time = time.time()
         

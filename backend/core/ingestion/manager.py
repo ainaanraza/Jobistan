@@ -67,11 +67,11 @@ class IngestionManager:
         raw = "|".join(identifiers)
         return hashlib.sha256(raw.encode('utf-8')).hexdigest()
 
-    def fetch_source(self, url: str) -> FetchResult:
+    def fetch_source(self, url: str, db=None, source_id=None, force_heal: bool = False) -> FetchResult:
         adapter = self.get_adapter(url)
-        return adapter.fetch_jobs(url)
+        return adapter.fetch_jobs(url, db, source_id, force_heal)
 
-    def process_source(self, db: Session, source: JobSource) -> Dict[str, Any]:
+    def process_source(self, db: Session, source: JobSource, force_heal: bool = False) -> Dict[str, Any]:
         """
         Fetches the source, computes hashes, and updates DB jobs.
         Returns a summary dictionary for tracking.
@@ -91,7 +91,7 @@ class IngestionManager:
         }
 
         try:
-            result = self.fetch_source(source.url)
+            result = self.fetch_source(source.url, db, source.id, force_heal)
             jobs = result.jobs
             diagnostics = result.diagnostics.model_dump()
             

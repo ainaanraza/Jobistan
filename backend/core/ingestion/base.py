@@ -40,6 +40,17 @@ class IngestionDiagnostics(BaseModel):
     errors: List[str] = []
     warnings: List[str] = []
     metadata: Dict[str, Any] = {}
+    
+    # Self-healing diagnostics
+    rule_version: Optional[int] = None
+    rule_confidence: Optional[float] = None
+    health_status: Optional[str] = None
+    healing_attempted: bool = False
+    healing_status: Optional[str] = None
+    healing_reason: Optional[str] = None
+    previous_rule_version: Optional[int] = None
+    new_rule_version: Optional[int] = None
+    validation_score: Optional[float] = None
 
 class FetchResult(BaseModel):
     jobs: List[NormalizedJob]
@@ -53,6 +64,6 @@ class JobSourceAdapter(ABC):
         pass
 
     @abstractmethod
-    def fetch_jobs(self, url: str) -> FetchResult:
+    def fetch_jobs(self, url: str, db=None, source_id=None, force_heal: bool = False) -> FetchResult:
         """Fetch all jobs from the given URL and return a FetchResult."""
         pass

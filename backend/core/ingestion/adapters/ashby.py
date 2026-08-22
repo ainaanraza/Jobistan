@@ -9,7 +9,7 @@ class AshbyAdapter(JobSourceAdapter):
     def can_handle(cls, url: str) -> bool:
         return "jobs.ashbyhq.com" in url or "api.ashbyhq.com" in url
 
-    def fetch_jobs(self, url: str) -> FetchResult:
+    def fetch_jobs(self, url: str, db=None, source_id=None) -> FetchResult:
         import time
         start_time = time.time()
         

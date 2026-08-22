@@ -20,4 +20,4 @@ langchain-openai
 duckduckgo-search
 pytest
 email-validator
-google-genai
+google-genaiapscheduler

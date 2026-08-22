@@ -17,7 +17,7 @@ class LeverAdapter(JobSourceAdapter):
             return len(path_parts) >= 1
         return False
 
-    def fetch_jobs(self, url: str) -> FetchResult:
+    def fetch_jobs(self, url: str, db=None, source_id=None) -> FetchResult:
         import time
         start_time = time.time()
         
